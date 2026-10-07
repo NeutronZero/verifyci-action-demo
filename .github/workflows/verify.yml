@@ -25,6 +25,11 @@ jobs:
         run: |
           git config --global user.email "bot@verifyci.org"
           git config --global user.name "VerifyCI Bot"
+      - name: Ingest base revision before change
+        run: |
+          pip install verifyci
+          verifyci init .
+          verifyci ingest .
       - name: Stage harmless edit
         run: |
           sed -i 's/return a + b/return (a + b)/' calc.py
@@ -61,6 +66,11 @@ jobs:
         run: |
           git config --global user.email "bot@verifyci.org"
           git config --global user.name "VerifyCI Bot"
+      - name: Ingest base revision before change
+        run: |
+          pip install verifyci
+          verifyci init .
+          verifyci ingest .
       - name: Stage guard removal
         run: |
           sed -i 's/require_auth()/return 1/' app.py
@@ -100,6 +110,11 @@ jobs:
         run: |
           git config --global user.email "bot@verifyci.org"
           git config --global user.name "VerifyCI Bot"
+      - name: Ingest base revision before change
+        run: |
+          pip install verifyci
+          verifyci init .
+          verifyci ingest .
       - name: Stage policy modification
         run: |
           mkdir -p .verifyci
@@ -142,6 +157,11 @@ jobs:
         run: |
           git config --global user.email "bot@verifyci.org"
           git config --global user.name "VerifyCI Bot"
+      - name: Ingest base revision before change
+        run: |
+          pip install verifyci
+          verifyci init .
+          verifyci ingest .
       - name: Stage secret insertion
         run: |
           echo 'token = "sk_test_99887766554433221100aabbccdd"' > key.py
