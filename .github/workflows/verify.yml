@@ -21,6 +21,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Configure git identity
+        run: |
+          git config --global user.email "bot@verifyci.org"
+          git config --global user.name "VerifyCI Bot"
       - name: Stage harmless edit
         run: |
           sed -i 's/return a + b/return (a + b)/' calc.py
@@ -53,6 +57,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Configure git identity
+        run: |
+          git config --global user.email "bot@verifyci.org"
+          git config --global user.name "VerifyCI Bot"
       - name: Stage guard removal
         run: |
           sed -i 's/require_auth()/return 1/' app.py
@@ -88,6 +96,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Configure git identity
+        run: |
+          git config --global user.email "bot@verifyci.org"
+          git config --global user.name "VerifyCI Bot"
       - name: Stage policy modification
         run: |
           mkdir -p .verifyci
@@ -126,6 +138,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Configure git identity
+        run: |
+          git config --global user.email "bot@verifyci.org"
+          git config --global user.name "VerifyCI Bot"
       - name: Stage secret insertion
         run: |
           echo 'token = "sk_test_99887766554433221100aabbccdd"' > key.py
@@ -168,6 +184,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Configure git identity
+        run: |
+          git config --global user.email "bot@verifyci.org"
+          git config --global user.name "VerifyCI Bot"
       - name: Stage harmless edit
         run: |
           sed -i 's/return a + b/return (a + b)/' calc.py
