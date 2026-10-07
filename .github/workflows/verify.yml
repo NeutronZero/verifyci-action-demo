@@ -1,0 +1,192 @@
+name: Live Action Verification
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # ==================================================================
+  # CASE A: CLEAN / HARMLESS CHANGE -> PASS (exit 0)
+  # ==================================================================
+  case-a-clean:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Stage harmless edit
+        run: |
+          sed -i 's/return a + b/return (a + b)/' calc.py
+          git commit -am "test: harmless refactor"
+      - name: Run VerifyCI Action
+        id: vci
+        uses: NeutronZero/VerifyCI@v0.1.0
+        with:
+          base-ref: "HEAD~1"
+          head-ref: "HEAD"
+          format: "sarif"
+          output-file: "case_a.sarif"
+      - name: Validate Case A Verdict
+        run: |
+          echo "Status: ${{ steps.vci.outputs.status }}"
+          echo "Exit code: ${{ steps.vci.outputs.exit-code }}"
+          test "${{ steps.vci.outputs.status }}" = "PASS"
+          test "${{ steps.vci.outputs.exit-code }}" = "0"
+          test -f case_a.sarif
+
+  # ==================================================================
+  # CASE B: BLOCKING INVARIANT VIOLATION -> FAIL (exit 1)
+  # ==================================================================
+  case-b-blocking:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Stage guard removal
+        run: |
+          sed -i 's/require_auth()/return 1/' app.py
+          git commit -am "test: bypass auth guard"
+      - name: Run VerifyCI Action
+        id: vci
+        continue-on-error: true
+        uses: NeutronZero/VerifyCI@v0.1.0
+        with:
+          base-ref: "HEAD~1"
+          head-ref: "HEAD"
+          format: "sarif"
+          output-file: "case_b.sarif"
+      - name: Validate Case B Verdict (Fail-Closed)
+        run: |
+          echo "Status: ${{ steps.vci.outputs.status }}"
+          echo "Exit code: ${{ steps.vci.outputs.exit-code }}"
+          echo "Step outcome: ${{ steps.vci.outcome }}"
+          test "${{ steps.vci.outcome }}" = "failure"
+          test "${{ steps.vci.outputs.status }}" = "FAIL"
+          test "${{ steps.vci.outputs.exit-code }}" = "1"
+          test -f case_b.sarif
+
+  # ==================================================================
+  # CASE C: POLICY TAMPERING -> HUMAN_REVIEW (exit 2, fail-closed)
+  # ==================================================================
+  case-c-policy-tampering:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Stage policy modification
+        run: |
+          mkdir -p .verifyci
+          echo "policy_tampering: true" >> .verifyci/invariants.yaml
+          git add .verifyci/invariants.yaml
+          git commit -m "test: tamper with invariants policy"
+      - name: Run VerifyCI Action
+        id: vci
+        continue-on-error: true
+        uses: NeutronZero/VerifyCI@v0.1.0
+        with:
+          base-ref: "HEAD~1"
+          head-ref: "HEAD"
+          format: "sarif"
+          output-file: "case_c.sarif"
+          fail-on-inconclusive: "true"
+      - name: Validate Case C Verdict (Fail-Closed)
+        run: |
+          echo "Status: ${{ steps.vci.outputs.status }}"
+          echo "Exit code: ${{ steps.vci.outputs.exit-code }}"
+          echo "Step outcome: ${{ steps.vci.outcome }}"
+          test "${{ steps.vci.outcome }}" = "failure"
+          test "${{ steps.vci.outputs.status }}" = "HUMAN_REVIEW"
+          test "${{ steps.vci.outputs.exit-code }}" = "2"
+          test -f case_c.sarif
+
+  # ==================================================================
+  # CASE D: SYNTHETIC SECRET FINDING -> FAIL (exit 1, zero leakage)
+  # ==================================================================
+  case-d-secret:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Stage secret insertion
+        run: |
+          echo 'token = "sk_test_99887766554433221100aabbccdd"' > key.py
+          git add key.py
+          git commit -m "test: commit stripe test token"
+      - name: Run VerifyCI Action
+        id: vci
+        continue-on-error: true
+        uses: NeutronZero/VerifyCI@v0.1.0
+        with:
+          base-ref: "HEAD~1"
+          head-ref: "HEAD"
+          format: "sarif"
+          output-file: "case_d.sarif"
+      - name: Validate Case D Verdict and Zero Secret Leakage
+        run: |
+          echo "Status: ${{ steps.vci.outputs.status }}"
+          echo "Exit code: ${{ steps.vci.outputs.exit-code }}"
+          echo "Step outcome: ${{ steps.vci.outcome }}"
+          test "${{ steps.vci.outcome }}" = "failure"
+          test "${{ steps.vci.outputs.status }}" = "FAIL"
+          test "${{ steps.vci.outputs.exit-code }}" = "1"
+          test -f case_d.sarif
+          # Verify zero secret leakage in SARIF
+          if grep -q "sk_test_99887766554433221100aabbccdd" case_d.sarif; then
+            echo "SECRET LEAK DETECTED IN SARIF!"
+            exit 1
+          fi
+          echo "Verified: Zero secret leakage in case_d.sarif"
+
+  # ==================================================================
+  # CASE E: INFRASTRUCTURE FAILURE -> INFRA_ERROR (exit 3)
+  # ==================================================================
+  case-e-infra-error:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Stage harmless edit
+        run: |
+          sed -i 's/return a + b/return (a + b)/' calc.py
+          git commit -am "test: edit"
+      - name: Run VerifyCI Action pointing to corrupted/missing DB
+        id: vci
+        continue-on-error: true
+        uses: NeutronZero/VerifyCI@v0.1.0
+        with:
+          base-ref: "HEAD~1"
+          head-ref: "HEAD"
+          db: "nonexistent/missing.db"
+          format: "sarif"
+          output-file: "case_e.sarif"
+      - name: Validate Case E Verdict (Infra Failure Honest Exit 3)
+        run: |
+          echo "Status: ${{ steps.vci.outputs.status }}"
+          echo "Exit code: ${{ steps.vci.outputs.exit-code }}"
+          echo "Step outcome: ${{ steps.vci.outcome }}"
+          test "${{ steps.vci.outcome }}" = "failure"
+          test "${{ steps.vci.outputs.status }}" = "INFRA_ERROR"
+          test "${{ steps.vci.outputs.exit-code }}" = "3"
